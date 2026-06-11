@@ -2,6 +2,7 @@ import os
 import telebot
 import gspread
 from google.oauth2.service_account import Credentials
+from datetime import date
 import json
 
 TOKEN = os.environ.get("BOT_TOKEN")
@@ -29,6 +30,7 @@ def start(message):
         "📖 /take [название] — взять книгу\n"
         "↩️ /return [название] — вернуть книгу\n"
         "📋 /list — все свободные книги\n"
+        "🗂 /mybooks — мои взятые книги\n"
         "➕ /add [название] | [автор] — добавить свою книгу"
     )
 
@@ -36,7 +38,7 @@ def start(message):
 def list_books(message):
     sheet = get_sheet()
     rows = sheet.get_all_records()
-    free = [r for r in rows if r["Статус"] == "Свободна"]
+    free = [r for r in rows if str(r["Статус"]) == "Свободна"]
     if not free:
         bot.send_message(message.chat.id, "😔 Сейчас нет свободных книг")
         return
@@ -60,7 +62,7 @@ def search(message):
         return
     text = "🔍 Результаты поиска:\n\n"
     for r in found:
-        status = "✅ Свободна" if r["Статус"] == "Свободна" else f"❌ Занята (взял: {r['Кто взял']})"
+        status = "✅ Свободна" if str(r["Статус"]) == "Свободна" else f"❌ Занята (взял: {r['Кто взял']})"
         text += f"📖 {r['Название']} — {r['Автор']}\n👤 Владелец: {r['Владелец']}\n{status}\n\n"
     bot.send_message(message.chat.id, text)
 
@@ -75,17 +77,16 @@ def take(message):
     rows = sheet.get_all_records()
     for i, r in enumerate(rows, 2):
         if query in str(r["Название"]).lower():
-            if r["Статус"] == "Занята":
+            if str(r["Статус"]) == "Занята":
                 bot.send_message(message.chat.id, f"❌ Книга уже занята — взял {r['Кто взял']}")
                 return
             name = message.from_user.first_name
             if message.from_user.last_name:
                 name += f" {message.from_user.last_name}"
-          from datetime import date
-today = date.today().strftime("%d.%m.%Y")
-sheet.update(f"F{i}", [[name]])
-sheet.update(f"E{i}", [["Занята"]])
-sheet.update(f"G{i}", [[today]])
+            today = date.today().strftime("%d.%m.%Y")
+            sheet.update(f"E{i}", [["Занята"]])
+            sheet.update(f"F{i}", [[name]])
+            sheet.update(f"G{i}", [[today]])
             bot.send_message(message.chat.id, f"✅ Ты взял книгу «{r['Название']}»!")
             return
     bot.send_message(message.chat.id, "❌ Книга не найдена")
@@ -101,15 +102,31 @@ def return_book(message):
     rows = sheet.get_all_records()
     for i, r in enumerate(rows, 2):
         if query in str(r["Название"]).lower():
-            if r["Статус"] == "Свободна":
+            if str(r["Статус"]) == "Свободна":
                 bot.send_message(message.chat.id, "📖 Эта книга и так свободна")
                 return
-           sheet.update(f"F{i}", [[""]])
-sheet.update(f"E{i}", [["Свободна"]])
-sheet.update(f"G{i}", [[""]])
+            sheet.update(f"E{i}", [["Свободна"]])
+            sheet.update(f"F{i}", [[""]])
+            sheet.update(f"G{i}", [[""]])
             bot.send_message(message.chat.id, f"✅ Книга «{r['Название']}» возвращена!")
             return
     bot.send_message(message.chat.id, "❌ Книга не найдена")
+
+@bot.message_handler(commands=["mybooks"])
+def my_books(message):
+    name = message.from_user.first_name
+    if message.from_user.last_name:
+        name += f" {message.from_user.last_name}"
+    sheet = get_sheet()
+    rows = sheet.get_all_records()
+    taken = [r for r in rows if str(r["Кто взял"]) == name]
+    if not taken:
+        bot.send_message(message.chat.id, "📭 У тебя нет взятых книг")
+        return
+    text = "📚 Твои книги:\n\n"
+    for r in taken:
+        text += f"• {r['Название']} — {r['Автор']} (взята {r['Дата взятия']})\n"
+    bot.send_message(message.chat.id, text)
 
 @bot.message_handler(commands=["add"])
 def add_book(message):
