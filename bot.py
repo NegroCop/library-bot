@@ -54,7 +54,7 @@ def search(message):
     query = parts[1].lower()
     sheet = get_sheet()
     rows = sheet.get_all_records()
-    found = [r for r in rows if query in str(r["Название"])() or query in r["Автор"].lower()]
+    found = [r for r in rows if query in str(r["Название"])() or query in str(r["Автор"]).lower()]
     if not found:
         bot.send_message(message.chat.id, "❌ Книга не найдена")
         return
