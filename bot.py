@@ -54,7 +54,7 @@ def search(message):
     query = parts[1].lower()
     sheet = get_sheet()
     rows = sheet.get_all_records()
-    found = [r for r in rows if query in r["Название"].lower() or query in r["Автор"].lower()]
+    found = [r for r in rows if query in str(r["Название"])() or query in r["Автор"].lower()]
     if not found:
         bot.send_message(message.chat.id, "❌ Книга не найдена")
         return
@@ -74,7 +74,7 @@ def take(message):
     sheet = get_sheet()
     rows = sheet.get_all_records()
     for i, r in enumerate(rows, 2):
-        if query in r["Название"].lower():
+        if query in str(r["Название"]).lower():
             if r["Статус"] == "Занята":
                 bot.send_message(message.chat.id, f"❌ Книга уже занята — взял {r['Кто взял']}")
                 return
@@ -97,7 +97,7 @@ def return_book(message):
     sheet = get_sheet()
     rows = sheet.get_all_records()
     for i, r in enumerate(rows, 2):
-        if query in r["Название"].lower():
+        if query in str(r["Название"]).lower():
             if r["Статус"] == "Свободна":
                 bot.send_message(message.chat.id, "📖 Эта книга и так свободна")
                 return
