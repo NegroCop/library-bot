@@ -81,8 +81,11 @@ def take(message):
             name = message.from_user.first_name
             if message.from_user.last_name:
                 name += f" {message.from_user.last_name}"
-            sheet.update(f"F{i}", [[name]])
-            sheet.update(f"E{i}", [["Занята"]])
+          from datetime import date
+today = date.today().strftime("%d.%m.%Y")
+sheet.update(f"F{i}", [[name]])
+sheet.update(f"E{i}", [["Занята"]])
+sheet.update(f"G{i}", [[today]])
             bot.send_message(message.chat.id, f"✅ Ты взял книгу «{r['Название']}»!")
             return
     bot.send_message(message.chat.id, "❌ Книга не найдена")
@@ -101,8 +104,9 @@ def return_book(message):
             if r["Статус"] == "Свободна":
                 bot.send_message(message.chat.id, "📖 Эта книга и так свободна")
                 return
-            sheet.update(f"F{i}", [[""]])
-            sheet.update(f"E{i}", [["Свободна"]])
+           sheet.update(f"F{i}", [[""]])
+sheet.update(f"E{i}", [["Свободна"]])
+sheet.update(f"G{i}", [[""]])
             bot.send_message(message.chat.id, f"✅ Книга «{r['Название']}» возвращена!")
             return
     bot.send_message(message.chat.id, "❌ Книга не найдена")
