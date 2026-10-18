@@ -64,8 +64,11 @@ def list_books(message):
     for owner, books in owners.items():
         text += f"👤 {owner}:\n"
         for r in books:
-            status = "✅" if str(r["Статус"]) == "Свободна" else "❌"
-            text += f"  {status} {r['Название']} — {r['Автор']}\n"
+            if str(r["Статус"]) == "Свободна":
+                status = "✅"
+                text += f"  {status} {r['Название']} — {r['Автор']}\n"
+            else:
+                text += f"  ❌ {r['Название']} — {r['Автор']}\n      👤 Взял: {r['Кто взял']} ({r['Дата взятия']})\n"
         text += "\n"
     bot.send_message(message.chat.id, text)
 
