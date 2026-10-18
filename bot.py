@@ -115,13 +115,32 @@ def return_book(message):
     rows = sheet.get_all_records()
     for i, r in enumerate(rows, 2):
         if str(r["Кто взял"]) == name:
-            sheet.update(f"E{i}", [["Свободна"]])
-            sheet.update(f"F{i}", [[""]])
-            sheet.update(f"G{i}", [[""]])
-            bot.send_message(message.chat.id, f"✅ Книга «{r['Название']}» возвращена!")
+            keyboard = telebot.types.InlineKeyboardMarkup()
+            keyboard.add(
+                telebot.types.InlineKeyboardButton("✅ Да", callback_data=f"return_{i}"),
+                telebot.types.InlineKeyboardButton("❌ Нет", callback_data="return_cancel")
+            )
+            bot.send_message(message.chat.id,
+                f"Хочешь вернуть книгу «{r['Название']}»?",
+                reply_markup=keyboard
+            )
             return
     bot.send_message(message.chat.id, "📭 У тебя нет взятых книг")
 
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith("return_"))
+def return_confirm(call):
+    if call.data == "return_cancel":
+        bot.edit_message_text("Окей, книга остаётся у тебя 📚", call.message.chat.id, call.message.message_id)
+        return
+    row_index = int(call.data.split("_")[1])
+    sheet = get_sheet()
+    rows = sheet.get_all_records()
+    r = rows[row_index - 2]
+    sheet.update(f"E{row_index}", [["Свободна"]])
+    sheet.update(f"F{row_index}", [[""]])
+    sheet.update(f"G{row_index}", [[""]])
+    bot.edit_message_text(f"✅ Книга «{r['Название']}» возвращена!", call.message.chat.id, call.message.message_id)
 
 @bot.message_handler(commands=["mybooks"])
 def my_books(message):
