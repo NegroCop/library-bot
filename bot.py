@@ -82,11 +82,6 @@ def search(message):
 
 @bot.message_handler(commands=["take"])
 def take(message):
-    parts = message.text.split(maxsplit=1)
-    if len(parts) < 2:
-        bot.send_message(message.chat.id, "Напиши так: /take Гарри Поттер")
-        return
-    query = parts[1].lower()
     name = get_name(message)
     sheet = get_sheet()
     rows = sheet.get_all_records()
@@ -94,18 +89,60 @@ def take(message):
     if len(already) >= 1:
         bot.send_message(message.chat.id, f"❌ Ты уже взял книгу «{already[0]['Название']}». Сначала верни её.")
         return
-    for i, r in enumerate(rows, 2):
-        if query in str(r["Название"]).lower():
-            if str(r["Статус"]) == "Занята":
-                bot.send_message(message.chat.id, f"❌ Книга уже занята — взял {r['Кто взял']}")
-                return
-            today = date.today().strftime("%d.%m.%Y")
-            sheet.update(f"E{i}", [["Занята"]])
-            sheet.update(f"F{i}", [[name]])
-            sheet.update(f"G{i}", [[today]])
-            bot.send_message(message.chat.id, f"✅ Ты взял книгу «{r['Название']}»!")
-            return
-    bot.send_message(message.chat.id, "❌ Книга не найдена")
+    free = [(i, r) for i, r in enumerate(rows, 2) if str(r["Статус"]) == "Свободна"]
+    if not free:
+        bot.send_message(message.chat.id, "😔 Сейчас нет свободных книг")
+        return
+    keyboard = telebot.types.InlineKeyboardMarkup()
+    for i, r in free:
+        keyboard.add(telebot.types.InlineKeyboardButton(
+            f"📖 {r['Название']} — {r['Автор']}",
+            callback_data=f"take_{i}"
+        ))
+    bot.send_message(message.chat.id, "Выбери книгу:", reply_markup=keyboard)
+
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith("take_"))
+def take_confirm(call):
+    row_index = int(call.data.split("_")[1])
+    sheet = get_sheet()
+    rows = sheet.get_all_records()
+    r = rows[row_index - 2]
+    keyboard = telebot.types.InlineKeyboardMarkup()
+    keyboard.add(
+        telebot.types.InlineKeyboardButton("✅ Да", callback_data=f"take_yes_{row_index}"),
+        telebot.types.InlineKeyboardButton("❌ Нет", callback_data="take_cancel")
+    )
+    bot.edit_message_text(
+        f"Хочешь взять книгу «{r['Название']}» — {r['Автор']}?",
+        call.message.chat.id,
+        call.message.message_id,
+        reply_markup=keyboard
+    )
+
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith("take_yes_"))
+def take_final(call):
+    row_index = int(call.data.split("_")[2])
+    name = call.from_user.first_name
+    if call.from_user.last_name:
+        name += f" {call.from_user.last_name}"
+    sheet = get_sheet()
+    rows = sheet.get_all_records()
+    r = rows[row_index - 2]
+    if str(r["Статус"]) == "Занята":
+        bot.edit_message_text("❌ Книгу только что взял кто-то другой", call.message.chat.id, call.message.message_id)
+        return
+    today = date.today().strftime("%d.%m.%Y")
+    sheet.update(f"E{row_index}", [["Занята"]])
+    sheet.update(f"F{row_index}", [[name]])
+    sheet.update(f"G{row_index}", [[today]])
+    bot.edit_message_text(f"✅ Ты взял книгу «{r['Название']}»!", call.message.chat.id, call.message.message_id)
+
+
+@bot.callback_query_handler(func=lambda call: call.data == "take_cancel")
+def take_cancel(call):
+    bot.edit_message_text("Окей, в другой раз 📚", call.message.chat.id, call.message.message_id)
 
 
 @bot.message_handler(commands=["return"])
