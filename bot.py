@@ -54,22 +54,19 @@ def start(message):
 def list_books(message):
     sheet = get_sheet()
     rows = sheet.get_all_records()
-    free = [r for r in rows if str(r["Статус"]) == "Свободна"]
-    taken = [r for r in rows if str(r["Статус"]) == "Занята"]
-    text = ""
-    if free:
-        text += "✅ Свободные книги:\n\n"
-        for r in free:
-            text += f"• {r['Название']} — {r['Автор']} (у {r['Владелец']})\n"
-    else:
-        text += "😔 Свободных книг нет\n"
-    text += "\n"
-    if taken:
-        text += "❌ Занятые книги:\n\n"
-        for r in taken:
-            text += f"• {r['Название']} — {r['Автор']}\n  👤 Взял: {r['Кто взял']} ({r['Дата взятия']})\n"
-    else:
-        text += "🎉 Все книги свободны!\n"
+    owners = {}
+    for r in rows:
+        owner = str(r["Владелец"])
+        if owner not in owners:
+            owners[owner] = []
+        owners[owner].append(r)
+    text = "📚 Библиотека класса:\n\n"
+    for owner, books in owners.items():
+        text += f"👤 {owner}:\n"
+        for r in books:
+            status = "✅" if str(r["Статус"]) == "Свободна" else "❌"
+            text += f"  {status} {r['Название']} — {r['Автор']}\n"
+        text += "\n"
     bot.send_message(message.chat.id, text)
 
 
