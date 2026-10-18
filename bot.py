@@ -234,4 +234,8 @@ def add_book(message):
 def unsupported(message):
     bot.send_message(message.chat.id, "📚 Я умею только работать с книгами. Напиши /start чтобы увидеть команды.")
 
+@bot.message_handler(func=lambda message: True)
+def unknown_text(message):
+    bot.send_message(message.chat.id, "📚 Я умею только работать с книгами. Напиши /start чтобы увидеть команды.")
+
 bot.infinity_polling()
