@@ -55,12 +55,21 @@ def list_books(message):
     sheet = get_sheet()
     rows = sheet.get_all_records()
     free = [r for r in rows if str(r["Статус"]) == "Свободна"]
-    if not free:
-        bot.send_message(message.chat.id, "😔 Сейчас нет свободных книг")
-        return
-    text = "📚 Свободные книги:\n\n"
-    for r in free:
-        text += f"• {r['Название']} — {r['Автор']} (у {r['Владелец']})\n"
+    taken = [r for r in rows if str(r["Статус"]) == "Занята"]
+    text = ""
+    if free:
+        text += "✅ Свободные книги:\n\n"
+        for r in free:
+            text += f"• {r['Название']} — {r['Автор']} (у {r['Владелец']})\n"
+    else:
+        text += "😔 Свободных книг нет\n"
+    text += "\n"
+    if taken:
+        text += "❌ Занятые книги:\n\n"
+        for r in taken:
+            text += f"• {r['Название']} — {r['Автор']}\n  👤 Взял: {r['Кто взял']} ({r['Дата взятия']})\n"
+    else:
+        text += "🎉 Все книги свободны!\n"
     bot.send_message(message.chat.id, text)
 
 
@@ -79,7 +88,15 @@ def search(message):
         return
     text = "🔍 Результаты поиска:\n\n"
     for r in found:
-        status = "✅ Свободна" if str(r["Статус"]) == "Свободна" else f"❌ Занята (взял: {r['Кто взял']})"
+        if str(r["Статус"]) == "Свободна":
+            status = "✅ Свободна"
+        else:
+            try:
+                taken_date = date(*reversed([int(x) for x in str(r["Дата взятия"]).split(".")]))
+                days = (date.today() - taken_date).days
+                status = f"❌ Занята — {r['Кто взял']}\n📅 Взята {r['Дата взятия']} ({days} дн. назад)"
+            except:
+                status = f"❌ Занята — {r['Кто взял']}"
         text += f"📖 {r['Название']} — {r['Автор']}\n👤 Владелец: {r['Владелец']}\n{status}\n\n"
     bot.send_message(message.chat.id, text)
 
