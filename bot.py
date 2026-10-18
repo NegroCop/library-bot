@@ -25,10 +25,14 @@ def get_sheet():
     return client.open_by_key(SHEET_ID).worksheet("Books")
 
 
-def get_name(message):
-    name = message.from_user.first_name
-    if message.from_user.last_name:
-        name += f" {message.from_user.last_name}"
+def get_name(message_or_user):
+    if hasattr(message_or_user, 'from_user'):
+        user = message_or_user.from_user
+    else:
+        user = message_or_user
+    name = user.first_name
+    if user.last_name:
+        name += f" {user.last_name}"
     return name
 
 
@@ -39,8 +43,8 @@ def start(message):
         "Команды:\n"
         "🔍 /search [название] — найти книгу\n"
         "📋 /list — все свободные книги\n"
-        "📖 /take [название] — взять книгу\n"
-        "↩️ /return [название] — вернуть книгу\n"
+        "📖 /take — взять книгу\n"
+        "↩️ /return — вернуть книгу\n"
         "🗂 /mybooks — мои взятые книги\n"
         "➕ /add [название] | [автор] — добавить свою книгу"
     )
@@ -102,6 +106,28 @@ def take(message):
     bot.send_message(message.chat.id, "Выбери книгу:", reply_markup=keyboard)
 
 
+@bot.callback_query_handler(func=lambda call: call.data == "take_cancel")
+def take_cancel(call):
+    bot.edit_message_text("Окей, в другой раз 📚", call.message.chat.id, call.message.message_id)
+
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith("take_yes_"))
+def take_final(call):
+    row_index = int(call.data.split("_")[2])
+    name = get_name(call)
+    sheet = get_sheet()
+    rows = sheet.get_all_records()
+    r = rows[row_index - 2]
+    if str(r["Статус"]) == "Занята":
+        bot.edit_message_text("❌ Книгу только что взял кто-то другой", call.message.chat.id, call.message.message_id)
+        return
+    today = date.today().strftime("%d.%m.%Y")
+    sheet.update(f"E{row_index}", [["Занята"]])
+    sheet.update(f"F{row_index}", [[name]])
+    sheet.update(f"G{row_index}", [[today]])
+    bot.edit_message_text(f"✅ Ты взял книгу «{r['Название']}»!", call.message.chat.id, call.message.message_id)
+
+
 @bot.callback_query_handler(func=lambda call: call.data.startswith("take_"))
 def take_confirm(call):
     row_index = int(call.data.split("_")[1])
@@ -119,30 +145,6 @@ def take_confirm(call):
         call.message.message_id,
         reply_markup=keyboard
     )
-
-
-@bot.callback_query_handler(func=lambda call: call.data.startswith("take_yes_"))
-def take_final(call):
-    row_index = int(call.data.split("_")[2])
-    name = call.from_user.first_name
-    if call.from_user.last_name:
-        name += f" {call.from_user.last_name}"
-    sheet = get_sheet()
-    rows = sheet.get_all_records()
-    r = rows[row_index - 2]
-    if str(r["Статус"]) == "Занята":
-        bot.edit_message_text("❌ Книгу только что взял кто-то другой", call.message.chat.id, call.message.message_id)
-        return
-    today = date.today().strftime("%d.%m.%Y")
-    sheet.update(f"E{row_index}", [["Занята"]])
-    sheet.update(f"F{row_index}", [[name]])
-    sheet.update(f"G{row_index}", [[today]])
-    bot.edit_message_text(f"✅ Ты взял книгу «{r['Название']}»!", call.message.chat.id, call.message.message_id)
-
-
-@bot.callback_query_handler(func=lambda call: call.data == "take_cancel")
-def take_cancel(call):
-    bot.edit_message_text("Окей, в другой раз 📚", call.message.chat.id, call.message.message_id)
 
 
 @bot.message_handler(commands=["return"])
@@ -165,11 +167,13 @@ def return_book(message):
     bot.send_message(message.chat.id, "📭 У тебя нет взятых книг")
 
 
+@bot.callback_query_handler(func=lambda call: call.data == "return_cancel")
+def return_cancel(call):
+    bot.edit_message_text("Окей, книга остаётся у тебя 📚", call.message.chat.id, call.message.message_id)
+
+
 @bot.callback_query_handler(func=lambda call: call.data.startswith("return_"))
 def return_confirm(call):
-    if call.data == "return_cancel":
-        bot.edit_message_text("Окей, книга остаётся у тебя 📚", call.message.chat.id, call.message.message_id)
-        return
     row_index = int(call.data.split("_")[1])
     sheet = get_sheet()
     rows = sheet.get_all_records()
@@ -178,6 +182,7 @@ def return_confirm(call):
     sheet.update(f"F{row_index}", [[""]])
     sheet.update(f"G{row_index}", [[""]])
     bot.edit_message_text(f"✅ Книга «{r['Название']}» возвращена!", call.message.chat.id, call.message.message_id)
+
 
 @bot.message_handler(commands=["mybooks"])
 def my_books(message):
