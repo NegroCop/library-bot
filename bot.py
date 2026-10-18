@@ -75,7 +75,7 @@ def take(message):
     query = parts[1].lower()
     sheet = get_sheet()
     rows = sheet.get_all_records()
-        already = [r for r in rows if str(r["Кто взял"]) == name]
+    already = [r for r in rows if str(r["Кто взял"]) == name]
     if len(already) >= 1:
         bot.send_message(message.chat.id, f"❌ Ты уже взял книгу «{already[0]['Название']}». Сначала верни её.")
         return
