@@ -55,7 +55,7 @@ def list_books(message):
     sheet = get_sheet()
     rows = sheet.get_all_records()
     owners = {}
-    for r in rows:
+    for r in sorted(rows, key=lambda x: str(x["Статус"]) != "Свободна"):
         owner = str(r["Владелец"])
         if owner not in owners:
             owners[owner] = []
