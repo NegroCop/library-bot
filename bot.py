@@ -97,29 +97,17 @@ def take(message):
 
 @bot.message_handler(commands=["return"])
 def return_book(message):
-    parts = message.text.split(maxsplit=1)
-    if len(parts) < 2:
-        bot.send_message(message.chat.id, "Напиши так: /return Гарри Поттер")
-        return
-    query = parts[1].lower()
-    name = message.from_user.first_name
-    if message.from_user.last_name:
-        name += f" {message.from_user.last_name}"
+    name = get_name(message)
     sheet = get_sheet()
     rows = sheet.get_all_records()
     for i, r in enumerate(rows, 2):
-        if query in str(r["Название"]).lower():
-            if str(r["Статус"]) == "Свободна":
-                continue
-            if str(r["Кто взял"]) != name:
-                bot.send_message(message.chat.id, f"❌ Эту книгу взял не ты, а {r['Кто взял']}")
-                return
+        if str(r["Кто взял"]) == name:
             sheet.update(f"E{i}", [["Свободна"]])
             sheet.update(f"F{i}", [[""]])
             sheet.update(f"G{i}", [[""]])
             bot.send_message(message.chat.id, f"✅ Книга «{r['Название']}» возвращена!")
             return
-    bot.send_message(message.chat.id, "❌ Книга не найдена или уже возвращена")
+    bot.send_message(message.chat.id, "📭 У тебя нет взятых книг")
 
 @bot.message_handler(commands=["mybooks"])
 def my_books(message):
