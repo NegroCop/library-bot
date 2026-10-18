@@ -229,6 +229,9 @@ def add_book(message):
     new_id = len(rows) + 1
     sheet.append_row([new_id, title.strip(), author.strip(), name, "Свободна", "", ""])
     bot.send_message(message.chat.id, f"✅ Книга «{title.strip()}» добавлена в библиотеку!")
-
+    
+@bot.message_handler(content_types=["photo", "voice", "sticker", "document", "video", "audio"])
+def unsupported(message):
+    bot.send_message(message.chat.id, "📚 Я умею только работать с книгами. Напиши /start чтобы увидеть команды.")
 
 bot.infinity_polling()
