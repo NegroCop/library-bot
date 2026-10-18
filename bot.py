@@ -11,28 +11,40 @@ GOOGLE_CREDS = os.environ.get("GOOGLE_CREDS")
 
 bot = telebot.TeleBot(TOKEN)
 
+
 def get_sheet():
     creds_dict = json.loads(GOOGLE_CREDS)
     creds = Credentials.from_service_account_info(
         creds_dict,
-        scopes=["https://www.googleapis.com/auth/spreadsheets",
-                "https://www.googleapis.com/auth/drive"]
+        scopes=[
+            "https://www.googleapis.com/auth/spreadsheets",
+            "https://www.googleapis.com/auth/drive"
+        ]
     )
     client = gspread.authorize(creds)
     return client.open_by_key(SHEET_ID).worksheet("Books")
+
+
+def get_name(message):
+    name = message.from_user.first_name
+    if message.from_user.last_name:
+        name += f" {message.from_user.last_name}"
+    return name
+
 
 @bot.message_handler(commands=["start"])
 def start(message):
     bot.send_message(message.chat.id,
         "📚 Добро пожаловать в школьную библиотеку!\n\n"
         "Команды:\n"
-        "🔍 /search [название] - найти книгу\n"
-        "📖 /take [название] - взять книгу\n"
-        "↩️ /return [название] - вернуть книгу\n"
-        "📋 /list - все свободные книги\n"
-        "🗂 /mybooks - мои взятые книги\n"
-        "➕ /add [название] | [автор] - добавить свою книгу"
+        "🔍 /search [название] — найти книгу\n"
+        "📋 /list — все свободные книги\n"
+        "📖 /take [название] — взять книгу\n"
+        "↩️ /return [название] — вернуть книгу\n"
+        "🗂 /mybooks — мои взятые книги\n"
+        "➕ /add [название] | [автор] — добавить свою книгу"
     )
+
 
 @bot.message_handler(commands=["list"])
 def list_books(message):
@@ -46,6 +58,7 @@ def list_books(message):
     for r in free:
         text += f"• {r['Название']} — {r['Автор']} (у {r['Владелец']})\n"
     bot.send_message(message.chat.id, text)
+
 
 @bot.message_handler(commands=["search"])
 def search(message):
@@ -66,6 +79,7 @@ def search(message):
         text += f"📖 {r['Название']} — {r['Автор']}\n👤 Владелец: {r['Владелец']}\n{status}\n\n"
     bot.send_message(message.chat.id, text)
 
+
 @bot.message_handler(commands=["take"])
 def take(message):
     parts = message.text.split(maxsplit=1)
@@ -73,6 +87,7 @@ def take(message):
         bot.send_message(message.chat.id, "Напиши так: /take Гарри Поттер")
         return
     query = parts[1].lower()
+    name = get_name(message)
     sheet = get_sheet()
     rows = sheet.get_all_records()
     already = [r for r in rows if str(r["Кто взял"]) == name]
@@ -84,9 +99,6 @@ def take(message):
             if str(r["Статус"]) == "Занята":
                 bot.send_message(message.chat.id, f"❌ Книга уже занята — взял {r['Кто взял']}")
                 return
-            name = message.from_user.first_name
-            if message.from_user.last_name:
-                name += f" {message.from_user.last_name}"
             today = date.today().strftime("%d.%m.%Y")
             sheet.update(f"E{i}", [["Занята"]])
             sheet.update(f"F{i}", [[name]])
@@ -95,25 +107,35 @@ def take(message):
             return
     bot.send_message(message.chat.id, "❌ Книга не найдена")
 
+
 @bot.message_handler(commands=["return"])
 def return_book(message):
+    parts = message.text.split(maxsplit=1)
+    if len(parts) < 2:
+        bot.send_message(message.chat.id, "Напиши так: /return Гарри Поттер")
+        return
+    query = parts[1].lower()
     name = get_name(message)
     sheet = get_sheet()
     rows = sheet.get_all_records()
     for i, r in enumerate(rows, 2):
-        if str(r["Кто взял"]) == name:
+        if query in str(r["Название"]).lower():
+            if str(r["Статус"]) == "Свободна":
+                continue
+            if str(r["Кто взял"]) != name:
+                bot.send_message(message.chat.id, f"❌ Эту книгу взял не ты, а {r['Кто взял']}")
+                return
             sheet.update(f"E{i}", [["Свободна"]])
             sheet.update(f"F{i}", [[""]])
             sheet.update(f"G{i}", [[""]])
             bot.send_message(message.chat.id, f"✅ Книга «{r['Название']}» возвращена!")
             return
-    bot.send_message(message.chat.id, "📭 У тебя нет взятых книг")
+    bot.send_message(message.chat.id, "❌ Книга не найдена или уже возвращена")
+
 
 @bot.message_handler(commands=["mybooks"])
 def my_books(message):
-    name = message.from_user.first_name
-    if message.from_user.last_name:
-        name += f" {message.from_user.last_name}"
+    name = get_name(message)
     sheet = get_sheet()
     rows = sheet.get_all_records()
     taken = [r for r in rows if str(r["Кто взял"]) == name]
@@ -125,6 +147,7 @@ def my_books(message):
         text += f"• {r['Название']} — {r['Автор']} (взята {r['Дата взятия']})\n"
     bot.send_message(message.chat.id, text)
 
+
 @bot.message_handler(commands=["add"])
 def add_book(message):
     parts = message.text.split(maxsplit=1)
@@ -132,13 +155,12 @@ def add_book(message):
         bot.send_message(message.chat.id, "Напиши так: /add Название | Автор")
         return
     title, author = parts[1].split("|", 1)
-    name = message.from_user.first_name
-    if message.from_user.last_name:
-        name += f" {message.from_user.last_name}"
+    name = get_name(message)
     sheet = get_sheet()
     rows = sheet.get_all_records()
     new_id = len(rows) + 1
     sheet.append_row([new_id, title.strip(), author.strip(), name, "Свободна", "", ""])
     bot.send_message(message.chat.id, f"✅ Книга «{title.strip()}» добавлена в библиотеку!")
+
 
 bot.infinity_polling()
